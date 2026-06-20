@@ -33,6 +33,13 @@ object ContractRoutes:
     .in(query[Int]("passenger_count"))
     .out(jsonBody[PricingResult])
 
+  val createContractEndpoint = baseEndpoint.post
+    .in("api" / "v1" / "contracts")
+    .in(header[String]("X-Idempotency-Key"))
+    .in(header[String]("X-Partner-Id"))
+    .in(jsonBody[CreateContractBody])
+    .out(jsonBody[CfarContract])
+
   def toErrorResponse(e: Throwable): ErrorResponse = e match {
     case err: AppError => ErrorResponse(err.code, err.message)
     case _             => ErrorResponse("INTERNAL_SERVER_ERROR", e.getMessage)
@@ -42,5 +49,8 @@ object ContractRoutes:
     pricingEndpoint.zServerLogic { case (partnerId, origin, dest, depDate, fare, currency, pax) =>
       val req = PricingRequest(partnerId, origin, dest, depDate, fare, currency, pax)
       service.calculatePricing(req).mapError(toErrorResponse)
+    },
+    createContractEndpoint.zServerLogic { case (idempotencyKey, partnerId, body) =>
+      service.createContract(body, partnerId, idempotencyKey).mapError(toErrorResponse)
     }
   )
