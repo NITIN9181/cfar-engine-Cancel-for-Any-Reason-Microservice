@@ -55,3 +55,62 @@ case class CfarContract(
   refundCompletedAt: Option[Instant],
   cancellationReason: Option[String]
 ) derives ConfiguredCodec
+
+case class PricingRequest(
+  partnerId: String,
+  origin: String,
+  destination: String,
+  departureDate: String,
+  fareAmount: BigDecimal,
+  fareCurrency: String,
+  passengerCount: Int
+) derives ConfiguredCodec
+
+case class CoveragePricing(
+  tier: String,
+  coveragePct: BigDecimal,
+  cfarFee: BigDecimal,
+  cfarFeePct: BigDecimal,
+  refundIfUsed: BigDecimal
+) derives ConfiguredCodec
+
+case class PricingResult(
+  partialCoverage: CoveragePricing,
+  fullCoverage: CoveragePricing,
+  riskScore: BigDecimal,
+  modelVersion: String,
+  expiresInSeconds: Int = 300
+) derives ConfiguredCodec
+
+case class CreateContractBody(
+  pnr: String,
+  origin: String,
+  destination: String,
+  departureDate: String,
+  fareAmount: BigDecimal,
+  fareCurrency: String,
+  passengerCount: Int,
+  coverageTier: String,
+  travelerId: Option[String] = None
+) derives ConfiguredCodec
+
+case class CancellationResult(
+  contractId: UUID,
+  status: ContractStatus,
+  refundAmount: BigDecimal,
+  refundCurrency: String,
+  refundTimeline: String,
+  cancelledAt: Instant,
+  message: String
+) derives ConfiguredCodec
+
+case class AuditEntry(
+  id: UUID,
+  contractId: UUID,
+  eventType: String,
+  fromStatus: Option[ContractStatus],
+  toStatus: Option[ContractStatus],
+  metadata: Map[String, String],
+  actorId: String,
+  createdAt: Instant
+) derives ConfiguredCodec
