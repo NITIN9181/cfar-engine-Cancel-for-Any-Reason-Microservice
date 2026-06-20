@@ -1,0 +1,38 @@
+---
+// PartnerLogo.astro
+---
+
+<div id="partner-logo-container" style="display: flex; align-items: center; height: 32px;">
+  <span class="partner-wordmark" style="font-size: var(--text-lg); font-weight: var(--font-bold); color: var(--color-brand-primary); transition: color 150ms ease-in-out;">
+    AeroDemo Airlines
+  </span>
+</div>
+
+<script>
+  function updateLogo() {
+    const container = document.getElementById('partner-logo-container');
+    if (!container) return;
+    
+    const stored = sessionStorage.getItem('cfar_partner_config');
+    if (stored) {
+      try {
+        const config = JSON.parse(stored);
+        if (config.brandLogoUrl) {
+          container.innerHTML = `<img src="${config.brandLogoUrl}" alt="${config.partnerName || 'Partner'}" style="height: 32px; object-fit: contain;" />`;
+        } else {
+          container.innerHTML = `<span class="partner-wordmark" style="font-size: var(--text-lg); font-weight: var(--font-bold); color: var(--color-brand-primary); transition: color 150ms ease-in-out;">${config.partnerName || 'AeroDemo Airlines'}</span>`;
+        }
+      } catch {
+        // fallback
+      }
+    } else {
+      container.innerHTML = `<span class="partner-wordmark" style="font-size: var(--text-lg); font-weight: var(--font-bold); color: var(--color-brand-primary); transition: color 150ms ease-in-out;">AeroDemo Airlines</span>`;
+    }
+  }
+
+  // Initial update
+  updateLogo();
+
+  // Listen to custom theme events
+  window.addEventListener('cfar-theme-changed', updateLogo);
+</script>

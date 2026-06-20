@@ -1,0 +1,64 @@
+---
+import '../styles/tokens.css';
+import '../styles/base.css';
+import '../styles/animations.css';
+import TopNav from '../components/shared/TopNav.astro';
+
+interface Props {
+  title?: string;
+}
+
+const { title = 'CFAR Engine' } = Astro.props;
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+  </head>
+  <body>
+    <TopNav />
+    <main style="flex: 1; display: flex; flex-direction: column;">
+      <slot />
+    </main>
+
+    <script>
+      import { lighten, darken, hexToLight } from '../utils/color';
+
+      function applyTheme() {
+        const stored = sessionStorage.getItem('cfar_partner_config');
+        if (stored) {
+          try {
+            const config = JSON.parse(stored);
+            if (config.brandColor) {
+              const primary = config.brandColor;
+              const primaryDark = darken(primary, 0.15);
+              const primaryLight = hexToLight(primary, 0.1);
+              
+              document.documentElement.style.setProperty('--color-brand-primary', primary);
+              document.documentElement.style.setProperty('--color-brand-primary-dark', primaryDark);
+              document.documentElement.style.setProperty('--color-brand-primary-light', primaryLight);
+            }
+          } catch (e) {
+            console.error('Failed to parse partner config from session storage', e);
+          }
+        }
+      }
+
+      // Initial apply
+      applyTheme();
+
+      // Listen for custom theme change events
+      window.addEventListener('cfar-theme-changed', applyTheme);
+      window.addEventListener('storage', (e) => {
+        if (e.key === 'cfar_partner_config') {
+          applyTheme();
+        }
+      });
+    </script>
+  </body>
+</html>
