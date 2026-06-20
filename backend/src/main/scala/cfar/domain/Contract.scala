@@ -114,3 +114,41 @@ case class AuditEntry(
   actorId: String,
   createdAt: Instant
 ) derives ConfiguredCodec
+
+sealed trait AppError extends Throwable:
+  def message: String
+  def code: String
+
+case class ContractNotFound(contractId: UUID) extends AppError:
+  override def message: String = s"Contract with ID $contractId not found"
+  override def code: String = "CONTRACT_NOT_FOUND"
+
+case class PartnerNotFound(partnerId: String) extends AppError:
+  override def message: String = s"Partner config for ID $partnerId not found"
+  override def code: String = "PARTNER_NOT_FOUND"
+
+case class WindowClosed(departureDate: LocalDate, windowHours: Int) extends AppError:
+  override def message: String = s"Cancellation window closed ($windowHours hours before departure)"
+  override def code: String = "WINDOW_CLOSED"
+
+case class ContractNotActive(status: ContractStatus) extends AppError:
+  override def message: String = s"Contract must be ACTIVE to be cancelled, current status: $status"
+  override def code: String = "CONTRACT_NOT_ACTIVE"
+
+case class InvalidInput(field: String, errMsg: String) extends AppError:
+  override def message: String = s"Invalid input for field $field: $errMsg"
+  override def code: String = "INVALID_INPUT"
+
+case class DuplicateContract(idempotencyKey: String) extends AppError:
+  override def message: String = s"Duplicate submission for key $idempotencyKey"
+  override def code: String = "DUPLICATE_CONTRACT"
+
+case class InternalServerError(errMsg: String) extends AppError:
+  override def message: String = errMsg
+  override def code: String = "INTERNAL_SERVER_ERROR"
+
+case class ErrorResponse(
+  code: String,
+  message: String,
+  details: Option[Map[String, String]] = None
+) derives ConfiguredCodec
