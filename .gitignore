@@ -1,0 +1,69 @@
+# Scala / sbt
+target/
+project/target/
+project/project/
+.bsp/
+.bloop/
+.metals/
+*.class
+*.jar
+*.war
+*.zip
+*.tgz
+
+# AI agent local config
+.agents/
+.claude/
+.kilocode/
+.kiro/
+
+# Project internal docs (not needed in published source)
+AGENTS.md
+DESIGN.md
+SPEC.md
+
+# Python virtual env
+.venv/
+
+# Node / Astro (frontend)
+frontend/node_modules/
+frontend/dist/
+frontend/.astro/
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.development
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Docker
+docker-compose.override.yml
+
+# Terraform
+infra/terraform/.terraform/
+infra/terraform/*.tfstate
+infra/terraform/*.tfstate.backup
+
+# Test output
+frontend/coverage/
+AI_WORKFLOW.md
+skills-lock.json
