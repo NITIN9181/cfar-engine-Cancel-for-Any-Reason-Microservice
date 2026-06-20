@@ -8,6 +8,7 @@ import io.circe.generic.auto.*
 import cfar.domain.*
 import cfar.service.ContractService
 import zio.*
+import java.util.UUID
 
 object ContractRoutes:
 
@@ -40,6 +41,10 @@ object ContractRoutes:
     .in(jsonBody[CreateContractBody])
     .out(jsonBody[CfarContract])
 
+  val getContractEndpoint = baseEndpoint.get
+    .in("api" / "v1" / "contracts" / path[UUID]("id"))
+    .out(jsonBody[CfarContract])
+
   def toErrorResponse(e: Throwable): ErrorResponse = e match {
     case err: AppError => ErrorResponse(err.code, err.message)
     case _             => ErrorResponse("INTERNAL_SERVER_ERROR", e.getMessage)
@@ -52,5 +57,8 @@ object ContractRoutes:
     },
     createContractEndpoint.zServerLogic { case (idempotencyKey, partnerId, body) =>
       service.createContract(body, partnerId, idempotencyKey).mapError(toErrorResponse)
+    },
+    getContractEndpoint.zServerLogic { id =>
+      service.getContract(id).mapError(toErrorResponse)
     }
   )
