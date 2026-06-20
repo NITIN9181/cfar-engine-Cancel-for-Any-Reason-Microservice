@@ -1,0 +1,47 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: cfar_engine
+      POSTGRES_USER: cfar
+      POSTGRES_PASSWORD: cfar_local
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: cfar_engine
+      DB_USER: cfar
+      DB_PASSWORD: cfar_local
+      APP_PORT: 8080
+      ENV: development
+      REFUND_SIMULATION_DELAY_S: 3
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    environment:
+      VITE_API_BASE_URL: http://localhost:8080
+      VITE_DEFAULT_PARTNER_ID: aerodemo_airlines
+      VITE_PRICING_QUOTE_TTL_S: 300
+    ports:
+      - "4321:4321"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
