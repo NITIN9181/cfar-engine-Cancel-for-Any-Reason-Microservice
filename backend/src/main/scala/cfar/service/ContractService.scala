@@ -3,6 +3,8 @@ package cfar.service
 import cfar.domain.*
 import cfar.repo.{ContractRepo, AuditRepo}
 import zio.*
+import java.time.{Instant, LocalDate, ZoneOffset}
+import java.time.temporal.ChronoUnit
 import java.util.UUID
 import scala.io.Source
 
@@ -63,3 +65,85 @@ case class ContractServiceLive(
       }
       result = PricingEngine.calculate(request, config, seedRates)
     } yield result
+
+  override def createContract(body: CreateContractBody, partnerId: String, idempotencyKey: String): Task[CfarContract] =
+    for {
+      existing <- repo.getContractByIdempotencyKey(idempotencyKey)
+      contract <- existing match {
+        case Some(c) => ZIO.succeed(c)
+        case None =>
+          for {
+            config <- repo.getPartnerConfig(partnerId).flatMap {
+              case Some(c) => ZIO.succeed(c)
+              case None => ZIO.fail(PartnerNotFound(partnerId))
+            }
+            pricingRequest = PricingRequest(
+              partnerId = partnerId,
+              origin = body.origin,
+              destination = body.destination,
+              departureDate = body.departureDate,
+              fareAmount = body.fareAmount,
+              fareCurrency = body.fareCurrency,
+              passengerCount = body.passengerCount
+            )
+            pricing = PricingEngine.calculate(pricingRequest, config, seedRates)
+            tierInfo = if (body.coverageTier.equalsIgnoreCase("full")) pricing.fullCoverage else pricing.partialCoverage
+
+            departureDate = LocalDate.parse(body.departureDate)
+            departureInstant = departureDate.atStartOfDay(ZoneOffset.UTC).toInstant
+            expiresInstant = departureInstant.minus(config.cancellationWindowH, ChronoUnit.HOURS)
+
+            id = UUID.randomUUID()
+            newContract = CfarContract(
+              id = id,
+              partnerId = partnerId,
+              pnr = body.pnr,
+              origin = body.origin.toUpperCase,
+              destination = body.destination.toUpperCase,
+              departureDate = departureDate,
+              passengerCount = body.passengerCount,
+              fareAmount = body.fareAmount,
+              fareCurrency = body.fareCurrency,
+              coverageTier = body.coverageTier.toLowerCase,
+              coveragePct = if (tierInfo.coveragePct > BigDecimal("1.0")) tierInfo.coveragePct / BigDecimal("100.0") else tierInfo.coveragePct,
+              cfarFee = tierInfo.cfarFee,
+              cfarFeePct = tierInfo.cfarFeePct,
+              status = ContractStatus.ACTIVE,
+              idempotencyKey = idempotencyKey,
+              riskScore = Some(pricing.riskScore),
+              modelVersion = Some(pricing.modelVersion),
+              travelerId = body.travelerId,
+              createdAt = Instant.now(),
+              updatedAt = Instant.now(),
+              expiresAt = expiresInstant,
+              cancelledAt = None,
+              refundAmount = None,
+              refundInitiatedAt = None,
+              refundCompletedAt = None,
+              cancellationReason = None
+            )
+            saved <- repo.createOrGetContract(newContract)
+            metadata = s"""{"risk_score": ${pricing.riskScore}, "model_version": "${pricing.modelVersion}", "cfar_fee": ${tierInfo.cfarFee}}"""
+            _ <- audit.addEntry(
+              contractId = saved.id,
+              eventType = "ContractCreated",
+              fromStatus = None,
+              toStatus = Some(ContractStatus.ACTIVE),
+              metadataJson = metadata,
+              actorId = "partner_api"
+            )
+          } yield saved
+      }
+    } yield contract
+
+  override def getContract(id: UUID): Task[CfarContract] =
+    repo.getContract(id).flatMap {
+      case Some(c) => ZIO.succeed(c)
+      case None => ZIO.fail(ContractNotFound(id))
+    }
+
+  override def getContractByPnr(pnr: String): Task[CfarContract] =
+    repo.getContractByPnr(pnr).flatMap {
+      case Some(c) => ZIO.succeed(c)
+      case None => ZIO.fail(ContractNotFound(UUID.randomUUID()))
+    }
