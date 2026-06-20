@@ -7,6 +7,7 @@ import java.time.{Instant, LocalDate, ZoneOffset}
 import java.time.temporal.ChronoUnit
 import java.util.UUID
 import scala.io.Source
+import scala.math.BigDecimal.RoundingMode
 
 trait ContractService:
   def calculatePricing(request: PricingRequest): Task[PricingResult]
@@ -147,3 +148,39 @@ case class ContractServiceLive(
       case Some(c) => ZIO.succeed(c)
       case None => ZIO.fail(ContractNotFound(UUID.randomUUID()))
     }
+
+  override def cancelContract(id: UUID, reason: Option[String], actorId: String = "traveler"): Task[CancellationResult] =
+    for {
+      contract <- getContract(id)
+      config <- repo.getPartnerConfig(contract.partnerId).flatMap {
+        case Some(c) => ZIO.succeed(c)
+        case None => ZIO.fail(PartnerNotFound(contract.partnerId))
+      }
+      now = Instant.now()
+      _ <- ZIO.fromEither(EligibilityValidator.validateCancellation(contract, now, config.cancellationWindowH))
+
+      coveragePctVal = if (contract.coveragePct > BigDecimal("1.0")) contract.coveragePct / BigDecimal("100.0") else contract.coveragePct
+      refundAmount = (contract.fareAmount * coveragePctVal).setScale(2, RoundingMode.HALF_UP)
+
+      _ <- repo.cancelContract(id, now, refundAmount, reason, ContractStatus.CANCELLED)
+      metadata = s"""{"refund_amount": $refundAmount, "reason": "${reason.getOrElse("")}"}"""
+      _ <- audit.addEntry(
+        contractId = id,
+        eventType = "ContractCancelled",
+        fromStatus = Some(ContractStatus.ACTIVE),
+        toStatus = Some(ContractStatus.CANCELLED),
+        metadataJson = metadata,
+        actorId = actorId
+      )
+
+      _ <- refundService.triggerRefundJob(id).forkDaemon
+
+    } yield CancellationResult(
+      contractId = id,
+      status = ContractStatus.CANCELLED,
+      refundAmount = refundAmount,
+      refundCurrency = contract.fareCurrency,
+      refundTimeline = "3-5 business days",
+      cancelledAt = now,
+      message = "Cancellation successful. Refund has been initiated."
+    )
